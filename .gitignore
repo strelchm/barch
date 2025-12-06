@@ -1,0 +1,5 @@
+node_modules
+build
+test/likec4-model.ts
+relationships.csv
+react/

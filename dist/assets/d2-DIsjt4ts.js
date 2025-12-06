@@ -1,0 +1,1 @@
+import{_ as t}from"./main-CxPBAt1F.js";import"./vendors-NDQaHV-q.js";import"./e-6DGAjISz.js";import"./i-BuNqYrfy.js";import"./likec4-BkvR35Il.js";import"./o-BkXc4xk3.js";let i={"likec4-template":()=>t(()=>import("./d2-CiTofqcY.js"),[])};async function c(o){const r=i[o];if(!r)throw new Error("Unknown projectId: "+o);return await r()}export{c as loadD2Sources,i as loadD2SourcesFn};

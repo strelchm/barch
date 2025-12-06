@@ -1,0 +1,14 @@
+specification {
+  element actor
+  element service
+}
+
+model {
+  // element of kind 'actor' with the name 'customer'
+  actor customer
+  // element of kind 'service' named as 'cloud'
+  service cloud
+
+  // also possible with '=' and the name goes first
+  cloud = service
+}

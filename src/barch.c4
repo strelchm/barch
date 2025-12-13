@@ -20,45 +20,167 @@ model {
     internetBankingSystem = softwaresystem "Банковская система" {
       description: "Банковская система barch"
 
-      banking = softwaresystem "Банковские сервисы" {
-      description: "Сервисы по работе с кошельками, клиентами, платежами и др."
+      paymentServices = softwaresystem "Платежные сервисы" {
+        description: "Сервисы по работе с кошельками, клиентами, платежами и др."
 
-      singlePageApplication = spa "SPA" {
-        description: "Вся функциональность интернет банкинга в вебраузере"
-        technology: "JavaScript"
-        style {
-          shape browser
+        // UI
+        singlePageApplication = spa "SPA" {
+          description: "Вся функциональность интернет банкинга в вебраузере"
+          technology: "JavaScript"
+          style {
+            shape browser
+          }
+        }
+
+        mobileApp = mobileApp "Мобильное приложение" {
+          description: "Ограниченная функциональность интернет банкинга в мобильном приложении"
+          technology: "Xamarin"
+        }
+
+        // INFRA
+        
+        gateway = softwaresystem "API Gateway" {
+          description: "API Gateway"
+          technology: "Envoy"
+        }
+
+        // SERVICES
+                              
+        customerService = softwaresystem "Customer Service" {
+          description: "Customer Service"
+          technology: "Spring"
+        }  
+
+        walletService = softwaresystem "Wallet Service" {
+          description: "Wallet Service"
+          technology: "Spring"
+        }
+                
+        paymentsService = softwaresystem "Payments Service" {
+          description: "Payments Service"
+          technology: "Spring/Temporal"
+        }
+                
+        antifrodService = softwaresystem "Anti-Fraud/Scoring Service" {
+          description: "Anti-Fraud/Scoring Service"
+          technology: "Spring + Flink"
+        }
+
+        callbackService = softwaresystem "Callback Service" {
+          description: "Обработка коллбеков"
+          technology: "Spring"
+        }
+            
+                
+        notificationsService = softwaresystem "Notifications Service" {
+          description: "Notifications Service"
+          technology: "Spring"
+        }
+                
+        coreIntegrationService = softwaresystem "Core Integration / ACL (обёртка над legacy core)" {
+          description: "Core Integration / ACL (обёртка над legacy core)"
+          technology: "Spring"
+        }
+
+        // BROKER
+        paymentBroker = queue "Брокер" {
+          description: "Брокер платежных сервисов"
+          technology: "Kafka"
+        }
+
+        // DB
+
+        customerDatabase = database "БД" {
+          description: "Регистрационная информация, журнал логов операций, договоры"
+          technology: "PostgreSQL"
+        }
+
+        walletDatabase = database "БД" {
+          description: "Информация о кошельках"
+          technology: "PostgreSQL"
+        }
+
+        paymentsDatabase = database "БД" {
+          description: "Платежи"
+          technology: "PostgreSQL"
+        }
+
+        antifrodDatabase = database "БД" {
+          description: "Регистрационная информация, журнал логов операций"
+          technology: "PostgreSQL"
+        }
+
+        notificationsDatabase = database "БД нотификаций" {
+          technology: "Cassandra, transactional inbox"
+        }
+
+        callbackDatabase = database "БД коллбеков" {
+          description: "Информация о коллбеках и мерчантах"
+          technology: "PostgreSQL"
         }
       }
 
-      mobileApp = mobileApp "Мобильное приложение" {
-        description: "Ограниченная функциональность интернет банкинга в мобильном приложении"
-        technology: "Xamarin"
+      paymentProcessing = softwaresystem "Платежный процессинг" {
+        description: "Сервисы по интеграции с платежными системами"
+        technology: "СБП,Swift,Корона,Visa"
+      }
+                
+      legacyBanking = softwaresystem "Legacy банкинг" {
+        description: "Legacy банкинг системы"
+        technology: "Spring"
       }
 
-      database = database "БД" {
-        description: "Регистрационная информация, журнал логов операций"
-        technology: "PostgreSQL"
+      legacyBankingDatabase = database "БД" {
+        technology: "Oracle"
       }
-    }
-
-        paymentProcessing = softwaresystem "Платежный процессинг" {
-          description: "Сервисы по интеграции с платежными системами"
-          technology: "СБП,Swift,Корона,Visa"
-        }
     }
   }
 
-  // relationships between people and software systems
-  customer -> internetBankingSystem.banking "Просмотр информации аккаунтов и выполнение платежей"
+  // ctx
+  customer -> internetBankingSystem.paymentServices "Просмотр информации аккаунтов и выполнение платежей"
   customer -> atm "Получает кеш"
-  atm -> internetBankingSystem.banking "Использует"
-  internetBankingSystem.banking -> internetBankingSystem.paymentProcessing "Обработка платежа"
-  internetBankingSystem.banking -> merchant "Уведомление о поступлении платежа со стороны клиента"
+  atm -> internetBankingSystem.paymentServices "Использует"
+  paymentsService -> internetBankingSystem.paymentProcessing "gRPC\nЗапрос на обработку платежа"
+  internetBankingSystem.paymentProcessing -> callbackService "gRPC WEBHOOK\nПолучение коллбека о платеже"
+  notificationsService -> merchant "Event: поступлении платежа со стороны клиента"
+  internetBankingSystem -> merchant "Уведомление о поступлении платежа со стороны клиента"
+  internetBankingSystem.paymentProcessing -> internetBankingSystem.paymentServices "Получение информации о проведении платежа"
+  internetBankingSystem.paymentServices -> internetBankingSystem.paymentProcessing "Запрос на обработку платежа"
+  internetBankingSystem.paymentServices -> internetBankingSystem.legacyBanking "Использование логики legacy-сервисов"
 
-  // relationships to/from containers
+  // containers
   customer -> singlePageApplication "Посещает barch.com по HTTPS. Просмотр информации об аккаунтах и проведение платежей"
   customer -> mobileApp "Просмотр информации об аккаунтах и проведение платежей"
+
+  customer -> gateway "REST"
+  atm -> gateway "REST"
+
+  gateway -> customerService "REST\nинфо о клиенте"
+  gateway -> walletService "REST\nинфо о кошельках"
+  gateway -> paymentsService "REST\nинфо о платежах\nзапрос на проведение платежа"
+
+
+  customerService -> customerDatabase "Персистирование/чтение данных"
+  walletService -> walletDatabase "Персистирование/чтение данных"
+  paymentsService -> paymentsDatabase "Персистирование/чтение данных"
+  antifrodService -> antifrodDatabase "Персистирование/чтение данных"
+  notificationsService -> notificationsDatabase "Персистирование/чтение данных"
+  coreIntegrationService -> legacyBanking "Использование легаси-функциональности"
+  legacyBanking -> legacyBankingDatabase
+  callbackService -> callbackDatabase
+  paymentsService -> antifrodService "gRPC\nПроверить платеж на фрод"
+
+  paymentsService -> antifrodService "gRPC\nПроверить платеж на фрод"
+  paymentBroker -> antifrodService "event\nуспешный платеж"
+  paymentBroker -> notificationsService "event\nуспешный платеж"
+  paymentBroker -> paymentsService  "event\nуспешный платеж"
+  callbackService -> paymentBroker "event\nуспешный платеж"
+  paymentsService -> customerService "gRPC\nпроверка договора и клиента"
+  paymentsService -> walletService "gRPC\nпроверка баланса"
+  paymentBroker -> walletService "event\nуспешный платеж"
+  paymentsService -> coreIntegrationService "gRPC\nВзаимодействие с легаси-банкингом"
+  callbackService -> paymentBroker "event\nОтправка нотификации мерчанту/клиенту"
+  notificationsService -> legacyBanking "smtp/https\nОтправка пушей"
 }
 
 views {
@@ -70,14 +192,31 @@ views {
       internetBankingSystem.*,
       customer,
       merchant,
-      banking,
-      atm
+      atm,
+      exclude legacyBankingDatabase, internetBankingSystem.paymentProcessing -> callbackService,
+      paymentsService -> internetBankingSystem.paymentProcessing,
+      atm -> gateway, internetBankingSystem.paymentServices.notificationsService -> merchant
   }
 
   view customer of customer {
+    title "Клиенты API"
     include
       *,
-      customer -> internetBankingSystem.banking.*,
+      customer -> internetBankingSystem.paymentServices.*,
       customer -> barch.*
+  }
+
+  view internetBankingSystemContainer of internetBankingSystem.paymentServices {
+    title "Платежные сервисы - Containers"
+
+    include
+      *,
+      -> merchant,
+      -> customer,
+      -> atm,
+      internetBankingSystem.paymentProcessing,
+      internetBankingSystem.legacyBanking,
+      internetBankingSystem.legacyBankingDatabase,
+      exclude customer -> atm, singlePageApplication, mobileApp
   }
 }

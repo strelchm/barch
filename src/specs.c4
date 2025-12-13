@@ -48,20 +48,27 @@ specification {
     }
   }
 
-  element staff {
-    notation 'Person, Bank Staff'
-    style {
-      color secondary
-      shape person
-    }
-  }
+  // element staff {
+  //   notation 'Person, Bank Staff'
+  //   style {
+  //     color secondary
+  //     shape person
+  //   }
+  // }
 
   // Structurizr does not have a database element
   // Just for the sake of the example
   element database {
     style {
       shape storage
+      color muted
     }
   }
 
+  element queue {
+    style {
+      shape queue
+      color muted
+    }
+  }
 }

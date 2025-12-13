@@ -1,0 +1,83 @@
+model {
+
+  customer = person "Клиент" {
+    technology: "мобильный/web/ATM"
+    description "Клиент банка"
+  }
+
+    merchant = person "Мерчант" {
+    technology: "мобильный/web/ATM"
+    description "Юридическое лицо, которому должен поступить платеж"
+  }
+
+
+  barch = enterprise "barch-банкинг" {
+
+    atm = existingsystem "ATM" {
+      description: "Банкомат для получения кеша"
+    }
+
+    internetBankingSystem = softwaresystem "Банковская система" {
+      description: "Банковская система barch"
+
+      banking = softwaresystem "Банковские сервисы" {
+      description: "Сервисы по работе с кошельками, клиентами, платежами и др."
+
+      singlePageApplication = spa "SPA" {
+        description: "Вся функциональность интернет банкинга в вебраузере"
+        technology: "JavaScript"
+        style {
+          shape browser
+        }
+      }
+
+      mobileApp = mobileApp "Мобильное приложение" {
+        description: "Ограниченная функциональность интернет банкинга в мобильном приложении"
+        technology: "Xamarin"
+      }
+
+      database = database "БД" {
+        description: "Регистрационная информация, журнал логов операций"
+        technology: "PostgreSQL"
+      }
+    }
+
+        paymentProcessing = softwaresystem "Платежный процессинг" {
+          description: "Сервисы по интеграции с платежными системами"
+          technology: "СБП,Swift,Корона,Visa"
+        }
+    }
+  }
+
+  // relationships between people and software systems
+  customer -> internetBankingSystem.banking "Просмотр информации аккаунтов и выполнение платежей"
+  customer -> atm "Получает кеш"
+  atm -> internetBankingSystem.banking "Использует"
+  internetBankingSystem.banking -> internetBankingSystem.paymentProcessing "Обработка платежа"
+  internetBankingSystem.banking -> merchant "Уведомление о поступлении платежа со стороны клиента"
+
+  // relationships to/from containers
+  customer -> singlePageApplication "Посещает barch.com по HTTPS. Просмотр информации об аккаунтах и проведение платежей"
+  customer -> mobileApp "Просмотр информации об аккаунтах и проведение платежей"
+}
+
+views {
+
+  view index of barch {
+    title "Платежная платформа банка, SystemContext"
+    include
+      barch,
+      internetBankingSystem.*,
+      customer,
+      merchant,
+      banking,
+      atm
+  }
+
+  view customer of customer {
+    include
+      *,
+      customer -> internetBankingSystem.banking.*,
+      customer -> barch.*
+  }
+}

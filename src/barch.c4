@@ -168,18 +168,24 @@ model {
   coreIntegrationService -> legacyBanking "Использование легаси-функциональности"
   legacyBanking -> legacyBankingDatabase
   callbackService -> callbackDatabase
-  paymentsService -> antifrodService "gRPC\nПроверить платеж на фрод"
-
-  paymentsService -> antifrodService "gRPC\nПроверить платеж на фрод"
-  paymentBroker -> antifrodService "event\nуспешный платеж"
+  
+  // Асинхронные проверки через Kafka вместо синхронных gRPC
+  paymentsService -> paymentBroker "event\n-запрос на проверку клиента\n-запрос на проверку кошелька\n-запрос на скоринг/фрод-проверку"
+  
+  paymentBroker -> customerService "event\nобработка проверки клиента"
+  paymentBroker -> walletService "event\n-обработка проверки кошелька\n-успешный платеж"
+  paymentBroker -> antifrodService "event\n-обработка скоринг/фрод-проверки\n-успешный платеж"
+  
+  customerService -> paymentBroker "event\nрезультат проверки клиента"
+  walletService -> paymentBroker "event\nрезультат проверки кошелька"
+  antifrodService -> paymentBroker "event\nрезультат скоринг/фрод-проверки"
+  
+  paymentBroker -> paymentsService "event\n-результаты всех проверок\n-успешный платеж"
+  
+  // Остальные взаимодействия
   paymentBroker -> notificationsService "event\nуспешный платеж"
-  paymentBroker -> paymentsService  "event\nуспешный платеж"
   callbackService -> paymentBroker "event\nуспешный платеж"
-  paymentsService -> customerService "gRPC\nпроверка договора и клиента"
-  paymentsService -> walletService "gRPC\nпроверка баланса"
-  paymentBroker -> walletService "event\nуспешный платеж"
   paymentsService -> coreIntegrationService "gRPC\nВзаимодействие с легаси-банкингом"
-  callbackService -> paymentBroker "event\nОтправка нотификации мерчанту/клиенту"
   notificationsService -> legacyBanking "smtp/https\nОтправка пушей"
 }
 

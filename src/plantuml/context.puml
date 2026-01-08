@@ -1,0 +1,26 @@
+@startuml Context_Diagram
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(customer, "Клиент банка", "мобильный/web/ATM")
+Person(merchant, "Мерчант", "мобильный/web/ATM")
+
+System_Boundary(barch, "barch-банкинг") {
+    System_Ext(atm, "ATM", "Банкомат для получения наличных")
+    System_Boundary(internetBankingSystem, "Банковская система barch") {
+        System(paymentServices, "Платежные сервисы", "Сервисы по работе с платежами, кошельками, клиентами, договорами и т.д.")
+        System(paymentProcessing, "Платежный процессинг", "Сервисы по интеграции с платежными системами", "СБП, Swift, Корона, Visa")
+        System(legacyBanking, "Legacy банкинг", "Legacy банкинг системы")
+    }
+}
+
+
+Rel(customer, paymentServices, "Просмотр информации аккаунтов и выполнение платежей")
+Rel(customer, atm, "Получает наличные")
+Rel(atm, paymentServices, "Использует банковскую систему")
+Rel(paymentServices, paymentProcessing, "Запрос на обработку платежа")
+Rel(paymentProcessing, paymentServices, "Получение информации о проведении платежа")
+Rel(paymentServices, legacyBanking, "Использование логики legacy-сервисов")
+Rel(paymentProcessing, paymentServices, "Получение коллбека о платеже")
+Rel(paymentServices, merchant, "Уведомление о поступлении платежа со стороны клиента")
+
+@enduml

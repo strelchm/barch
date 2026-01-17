@@ -1,0 +1,100 @@
+@startuml Containers
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' Добавляем определение цвета для серых элементов
+!define GREY #888888
+AddElementTag("grey", $fontColor=GREY, $borderColor=GREY)
+
+Person(customer, "Клиент банка", "мобильный/web/ATM")
+Person(merchant, "Мерчант", "мобильный/web/ATM")
+
+System_Boundary(barch, "barch-банкинг") {
+    System_Boundary(internetBankingSystem, "Банковская система") {
+
+        System_Boundary(paymentServices, "Платежные сервисы") {
+            ' --- API Gateway ---
+            Container(gateway, "API Gateway", "Envoy", "API Gateway для маршрутизации запросов")
+
+            ' --- Сервисы ---
+            Container(customerService, "Customer Service", "Spring", "Сервис управления клиентами")
+            Container(walletService, "Wallet Service", "Spring", "Сервис управления кошельками")
+            Container(paymentsService, "Payments Service", "Spring/Temporal", "Сервис обработки платежей")
+            Container(antifrodService, "Anti-Fraud/Scoring Service", "Spring + Flink", "Сервис антифрод и скоринга")
+            Container(callbackService, "Callback Service", "Spring", "Обработка коллбеков")
+            Container(notificationsService, "Notifications Service", "Spring", "Сервис уведомлений")
+            Container(coreIntegrationService, "Core Integration / ACL", "Spring", "Обёртка над legacy core")
+
+            ' --- Базы данных (серые) ---
+            ContainerDb_Ext(customerDatabase, "Customer Database", "PostgreSQL", "Регистрационная информация, журнал логов операций, договоры")
+            ContainerDb_Ext(walletDatabase, "Wallet Database", "PostgreSQL", "Информация о кошельках")
+            ContainerDb_Ext(paymentsDatabase, "Payments Database", "PostgreSQL", "Платежи")
+            ContainerDb_Ext(antifrodDatabase, "Anti-Fraud Database", "PostgreSQL", "Регистрационная информация, журнал логов операций")
+            ContainerDb_Ext(callbackDatabase, "Callback Database", "PostgreSQL", "Информация о коллбеках и мерчантах")
+            ContainerDb_Ext(notificationsDatabase, "Notifications Database", "Cassandra", "База нотификаций, transactional inbox")
+
+            ' --- Брокер (серый) ---
+            ContainerQueue_Ext(queue, "Брокер", "Kafka", "Брокер платежных сервисов")
+        }
+
+        ' --- Внешние системы внутри банка ---
+        Container_Ext(legacyBankingSystem, "Legacy банкинг", "Spring", "Legacy банкинг системы")
+        ContainerDb_Ext(legacyBankingDatabase, "Legacy Database", "Oracle", "БД legacy систем")
+    }
+
+    ' --- ATM ---
+    System_Ext(atm, "ATM", "Банкомат для получения наличных")
+}
+
+' --- Внешние платежные системы ---
+System_Ext(paymentProcessing, "Платежный процессинг", "Сервисы по интеграции с платежными системами", "СБП, Swift, Корона, Visa")
+
+' --- Применяем серый цвет к БД и брокеру ---
+UpdateElementStyle(customerDatabase, $fontColor=GREY, $borderColor=GREY)
+UpdateElementStyle(walletDatabase, $fontColor=GREY, $borderColor=GREY)
+UpdateElementStyle(paymentsDatabase, $fontColor=GREY, $borderColor=GREY)
+UpdateElementStyle(antifrodDatabase, $fontColor=GREY, $borderColor=GREY)
+UpdateElementStyle(callbackDatabase, $fontColor=GREY, $borderColor=GREY)
+UpdateElementStyle(notificationsDatabase, $fontColor=GREY, $borderColor=GREY)
+UpdateElementStyle(queue, $fontColor=GREY, $borderColor=GREY)
+UpdateElementStyle(legacyBankingDatabase, $fontColor=GREY, $borderColor=GREY)
+
+
+' --- Связи с пользователями и ATM ---
+Rel(customer, gateway, "Просмотр информации об аккаунтах и проведение платежей", "REST")
+Rel(atm, gateway, "Операции со счетами и кошельками", "REST")
+
+' --- Синхронные вызовы через Gateway ---
+Rel(gateway, customerService, "REST: инфо о клиенте", "REST")
+Rel(gateway, walletService, "REST: инфо о кошельках", "REST")
+Rel(gateway, paymentsService, "REST: инфо о платежах, запрос на проведение платежа", "REST")
+
+' --- Доступ к данным ---
+Rel(customerService, customerDatabase, "Персистирование/чтение данных", "JDBC")
+Rel(walletService, walletDatabase, "Персистирование/чтение данных", "JDBC")
+Rel(paymentsService, paymentsDatabase, "Персистирование/чтение данных", "JDBC")
+Rel(antifrodService, antifrodDatabase, "Персистирование/чтение данных", "JDBC")
+Rel(notificationsService, notificationsDatabase, "Персистирование/чтение данных", "CQL")
+Rel(callbackService, callbackDatabase, "Персистирование/чтение данных", "JDBC")
+Rel(legacyBankingSystem, legacyBankingDatabase, "Доступ к данным", "JDBC")
+Rel(coreIntegrationService, legacyBankingSystem, "Использование легаси-функциональности", "gRPC")
+Rel(paymentsService, coreIntegrationService, "Использование легаси-функциональности", "gRPC")
+
+' --- Асинхронные проверки через Kafka ---
+Rel(paymentsService, queue, "event: запрос на проверку клиента, кошелька, скоринг/фрод-проверку", "Kafka")
+Rel(queue, customerService, "event: обработка проверки клиента", "Kafka")
+Rel(queue, walletService, "event: обработка проверки кошелька, успешный платеж", "Kafka")
+Rel(queue, antifrodService, "event: обработка скоринг/фрод-проверки, успешный платеж", "Kafka")
+Rel(customerService, queue, "event: результат проверки клиента", "Kafka")
+Rel(walletService, queue, "event: результат проверки кошелька", "Kafka")
+Rel(antifrodService, queue, "event: результат скоринг/фрод-проверки", "Kafka")
+Rel(queue, paymentsService, "event: результаты всех проверок, успешный платеж", "Kafka")
+Rel(queue, notificationsService, "event: успешный платеж", "Kafka")
+
+' --- Взаимодействие с внешними системами ---
+Rel(paymentsService, paymentProcessing, "gRPC: запрос на обработку платежа", "gRPC")
+Rel(paymentProcessing, callbackService, "gRPC WEBHOOK: Получение коллбека о платеже", "gRPC")
+Rel(callbackService, queue, "event: успешный платеж", "Kafka")
+Rel(notificationsService, merchant, "Event: поступление платежа со стороны клиента", "HTTP/Event")
+Rel(notificationsService, legacyBankingSystem, "smtp/https: Отправка пушей", "SMTP/HTTPS")
+
+@enduml

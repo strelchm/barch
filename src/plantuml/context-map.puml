@@ -1,0 +1,39 @@
+@startuml
+skinparam linetype ortho
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+  RoundCorner 15
+}
+skinparam nodesep 40
+skinparam ranksep 40
+
+' Определение основных контекстов
+rectangle "Customer Context" as Customer
+rectangle "Wallets Context" as Wallets
+rectangle "Payments Context" as Payments
+rectangle "Merchant / Callbacks\nContext" as MerchantCallbacks
+rectangle "Notifications Context" as Notifications
+rectangle "Anti-Fraud / Scoring\nContext" as Scoring
+rectangle "Core Banking Context" as Core
+
+' Позиционирование
+Customer -[hidden]-> Wallets
+Wallets -[hidden]-> Payments
+Payments -[hidden]-> MerchantCallbacks
+
+Customer -[hidden]d-> Notifications
+Wallets -[hidden]d-> Scoring
+Payments -[hidden]d-> Core
+
+' Специальные связи
+Payments --[#brown]--> Wallets : <color:brown><b>OHS (D/U)</b></color>
+Wallets --[#brown]--> Customer : <color:brown><b>OHS (D/U)</b></color>
+Scoring --[#brown]--> Payments : <color:brown><b>OHS (D/U)</b></color>
+MerchantCallbacks --[#brown]--> Payments : <color:brown><b>OHS (D/U)</b></color>
+MerchantCallbacks --[#green]--> Notifications : <color:green><b>CONFORM (D/U)</b></color>
+MerchantCallbacks --[#brown]--> Customer : <color:brown><b>OHS (D/U)</b></color>
+Payments --[#green]--> Notifications : <color:green><b>CONFORM (D/U)</b></color>
+Payments --[#red]--> Core : <color:red><b>ACL (D/U)</b></color>
+
+@enduml
